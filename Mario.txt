@@ -1,0 +1,1121 @@
+JMP main
+JMP isr
+
+vsync: DW 0 ; 0 - false, 1 - true
+move: DW 0 ; 1 - Right, 2 - Left, 3 - Up, 4 - Down
+direction: DW 0 ; 0 - Right, 1 - Left
+left: DW 0x0FD0
+right: DW 0x0FD0
+up: DW 0x0FD0
+win_status: DW 0
+win_string: DB "YOU WON!"
+			DW 0
+lose_string: DB "YOU LOST!"
+			 DW 0
+
+mario_red_right:
+	DB "\x0F\x80\x3F\xF8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\x00\x08\x40\x0F\xC0"
+    DB "\x17\xB8\x1F\xF8\x3C\x3C\x38\x1C\x00\x00\x00\x00"
+mario_blue_right:
+	DB "\x00\x00\x00\x00\x3C\x80\x58\x80\x5C\x40\x60\xF8\x00\x00\x37\xC0\x77\xBC\xF0\x3F"
+    DB "\x20\x04\x00\x00\x00\x00\x00\x00\x70\x0E\xF0\x0F"
+mario_orange_right:
+	DB "\x00\x00\x00\x00\x03\x40\x27\x78\x23\xBE\x1F\x00\x1F\xF0\x00\x00\x00\x00\x00\x00"
+    DB "\xC8\x43\xE0\x07\xC0\x07\x00\x00\x00\x00\x00\x00"
+    
+;Left Side
+;-----------------------------------------------------------------------
+mario_red_left:
+	DB "\x01\xF0\x1F\xFC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10\x02\x10\x03\x10"
+   	DB "\x1D\xE8\x1F\xF8\x3C\x3C\x38\x1C\x00\x00\x00\x00"
+    
+mario_blue_left:
+	DB "\x00\x00\x00\x00\x01\x3C\x01\x1A\x02\x3A\x1F\x06\x00\x00\x03\xEC\x3D\xEE\xFC\x0F"
+	DB "\x20\x04\x00\x00\x00\x00\x00\x00\x70\x0E\xF0\x0F"
+    
+mario_orange_left:
+    	DB "\x00\x00\x00\x00\x02\xC0\x1E\xE4\x7D\xC4\x00\xF8\x0F\xF8\x00\x00\x00\x00\x00\x00"
+        DB "\xC2\x13\xE0\x07\xC0\x03\x00\x00\x00\x00\x00\x00"
+;Goomba-------------------------------------------------------
+goomba_white:
+	DB "\x00\x00\x00\x00\x00\x00\x00\x00\x08\x10\x0A\x50\x0E\x70\x00\x00\x00\x00"
+	DB "\x07\xE0\x0F\xF0\x0F\xF0\x0F\xF0\03\xE0\x01\x80\x01\x80"
+goomba_brown:
+	DB "\x07\xE0\x07\xE0\x0F\xF0\x1F\xF8\x37\xEC\xF5\xAF\xF1\x8F\xFF\xFF\xFF\xFF"
+    DB "\x18\x18\x00\x00\x00\x00\x10\x08\x38\x1C\x7E\x7E\x7E\x7E"
+block_green:
+	DB "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+    DB "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+clouds_white:
+	DB "\x10\x20\x02\x00\x30\x41\x00\x01\x01\x20\x01\x10\x10\x01\x01\x10\x10\x10"
+    DB "\x00\x00\x00\x00\x00\x00\x00\x10\x01\x10\x10\x01\x10\x10"
+flag: DB " Super Mario "
+      DB 0
+    
+isr:
+    PUSH A
+    
+ireq1:
+    IN 1
+    AND A, 1
+    
+    CMP A, 1
+    JNE ireq2
+    
+    IN 5
+    AND A, 1
+    
+    CMP A, 1
+    JE keydown
+    
+    IN 5
+    AND A, 2
+    
+    CMP A, 2
+    JE keyup
+    
+    JMP ireq1done
+    
+keydown:
+    MOV A, [move]
+    
+    CMP A, 3 ; If current move is 3 (up) block other movements.
+    JE ireq1done
+    
+    CMP A, 4 ; If current move is 4 (down) block other movements.
+    JE ireq1done
+    
+    IN 6
+    
+    CMPB AL, '6'
+    JE ireq1_start_moving_right
+    
+    CMPB AL, '4'
+    JE ireq1_start_moving_left
+    ;
+    CMPB AL, '8'
+    JE ireq1_start_moving_up
+    ;
+    JMP ireq1done
+    
+keyup:
+	MOV A, [move]
+    
+    CMP A, 3 ; If current move is 3 (up) block other movements.
+    JE ireq1done
+    
+    CMP A, 4 ; If current move is 4 (down) block other movements.
+    JE ireq1done
+    
+    IN 6
+    
+    CMPB AL, '6'
+    JE ireq1_stop_moving_right
+    
+    CMPB AL, '4'
+    JE ireq1_stop_moving_left
+    
+    JMP ireq1done 
+    
+ireq1_start_moving_right:
+    MOV [move], 1
+    MOV [direction], 0
+    JMP ireq1done
+    
+ireq1_start_moving_left:
+    MOV [move], 2
+    MOV [direction], 1
+    JMP ireq1done
+    
+ireq1_start_moving_up:
+	MOV [move], 3
+    JMP ireq1done
+    
+ireq1_stop_moving_right:
+    MOV [move], 0
+    JMP ireq1done
+    
+ireq1_stop_moving_left:
+    MOV [move], 0
+    JMP ireq1done
+    
+ireq1done:
+    IN 6
+    
+    MOV A, 1
+    OUT 2
+    
+    JMP iret
+    
+ireq2:
+    MOV [vsync], 1
+    MOV A, 4
+    OUT 2
+    
+iret:
+    POP A
+    IRET
+    
+    
+wait_frames:
+wait_frames_loop:
+   MOV A, [vsync] ; Check the current vsync value .
+   CMP A, 0 ; If still 0 ,
+   JE wait_frames_loop ; check it again .
+   MOV [vsync] , 0 ; The vsync signal received . Reset it.
+    RET
+        
+;---MOVES THE SCREEN HORIZONTAL------       
+wait_frames_hscroll:
+hscroll_loop:
+	MOV A, [vsync]
+    CMP A, 1
+    JNE hscroll_loop
+    MOV [vsync], 0
+
+;----------------------------
+;Function that moves the screen
+;----------------------------
+move_screen:
+	MOV A, 0xA302 ; Address for h-scroll
+    OUT 8
+    IN 9
+    ADD A, 4
+   	CMP A, 1270 ;Flag
+    JAE move_screen_end_game
+    JMP move_screen_continue
+    
+move_screen_end_game:
+	MOV [win_status], 1
+    JMP end_game
+    
+move_screen_continue:
+	OUT 9
+    RET
+;----------------------
+;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  
+clear_screen:
+	MOV A, 0xA302 ; Address for h-scroll
+    OUT 8
+    
+    MOV A, 0
+    OUT 9
+    
+    MOV D, 0
+    
+clear_screen_loop:
+	CMPB DH, 16
+    JE clear_screen_return
+    
+    MOV A, D
+    OUT 8
+    
+    MOV A, 0
+    OUT 9
+    
+    ADD D, 2
+    
+    CMPB DL, 32
+    JNE clear_screen_loop
+    
+    INCB DH
+    MOVB DL, 0
+    
+    JMP clear_screen_loop
+    
+clear_screen_return:
+	MOV A, [direction]
+    
+    CMP A, 0
+    JE clear_screen_undraw_mario_right
+    
+    CMP A, 1
+    JE clear_screen_undraw_mario_left
+    
+	JMP clear_screen_return_continue
+    
+clear_screen_undraw_mario_right:
+	CALL undraw_mario_right
+	JMP clear_screen_return_continue
+    
+clear_screen_undraw_mario_left:
+	CALL undraw_mario_left
+
+clear_screen_return_continue:
+	CALL undraw_goomba
+
+	RET
+
+draw_goomba:
+	MOV A, 0xA31E
+    OUT 8 ; adresa za sprite
+	
+    MOVB AH, 71
+    MOVB AL, 212
+    OUT 9
+    
+    MOV A, 0xA320
+	OUT 8 ; Seventh sprite
+    
+    MOV A, 0xFFD0
+    OUT 9
+    
+    MOV A, 0xA322 ; Eigth sprite
+    OUT 8
+    MOVB AH, 72
+    MOVB AL, 136
+    OUT 9
+    
+    MOV A, 0xA324
+    OUT 8
+    
+    IN 9
+    MOV A, 0xFFD0
+    OUT 9 
+    RET
+    
+;;; FUNCTION TO UNDRAW GOOMBA
+undraw_goomba:
+	MOV A, 0xA31E
+    OUT 8
+    
+    MOV A, 0
+    OUT 9
+	
+    MOV A, 0xA322
+    OUT 8
+     
+    MOV A, 0
+    OUT 9
+     
+    RET
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;FUNCTION TO DRAW MARIO RIGHT
+draw_mario_right:
+	
+	MOV A, 0xA306
+    OUT 8
+    
+    MOVB AH, 65
+    MOVB AL, 224
+    
+    OUT 9
+
+	MOV A, 0xA308
+    OUT 8 ; First sprite
+    MOV A, [right]
+	OUT 9
+;-----------------    
+    MOV A, 0xA30A
+    OUT 8
+    
+    MOVB AH, 66
+    MOVB AL, 35
+    OUT 9
+	
+	MOV A, 0xA30C
+    OUT 8 ; Second sprite
+    MOV A, [right]
+	OUT 9
+    
+;--------------------    
+     MOV A, 0xA30E
+     OUT 8
+    
+     MOVB AH, 67
+     MOVB AL, 246
+     OUT 9
+	
+	 MOV A, 0xA310
+     OUT 8 ; Third sprite
+     MOV A, [right]
+	 OUT 9
+     RET
+;FUNCTION TO UNDRAW MARIO RIGHT
+undraw_mario_right:
+	MOV A, 0xA306
+    OUT 8
+    
+    MOV A, 0
+    OUT 9
+	
+     MOV A, 0xA30A
+     OUT 8
+     
+     MOV A, 0
+     OUT 9
+     
+     MOV A, 0xA30E
+     OUT 8
+     
+     MOV A, 0 
+     OUT 9
+     
+     RET
+
+
+     
+    
+
+;------------------------
+; FUNCTION TO DRAW LEFT MARIO
+draw_mario_left:
+	MOV A, 0xA312
+    OUT 8
+    
+    MOVB AH, 68
+    MOVB AL, 224
+    
+    OUT 9
+
+	MOV A, 0xA314
+    OUT 8 ; Fourth sprite
+    MOV A, [left]
+	OUT 9
+;-----------------    
+    MOV A, 0xA316
+    OUT 8
+    
+    MOVB AH, 69
+    MOVB AL, 35
+    OUT 9
+	
+	MOV A, 0xA318
+    OUT 8 ; Fifth sprite
+    MOV A, [left]
+	OUT 9
+    
+;--------------------    
+     MOV A, 0xA31A
+     OUT 8
+    
+     MOVB AH, 70
+     MOVB AL, 246
+     OUT 9
+	
+	 MOV A, 0xA31C
+     OUT 8 ; Sixth sprite
+     MOV A, [left]
+	 OUT 9
+     RET
+;FUNCTION TO UNDRAW MARIO LEFT
+undraw_mario_left:
+	MOV A, 0xA312
+    OUT 8
+    MOV A, 0
+    OUT 9
+    
+    MOV A, 0xA316
+    OUT 8
+    MOV A, 0 
+    OUT 9
+
+	MOV A, 0xA31A
+    OUT 8
+    
+    MOV A, 0 
+    OUT 9
+    
+    RET
+    
+main:
+	MOV SP, 0x0FFF
+    MOV A, 1 
+    OUT 7
+    
+    MOV A, 5
+    OUT 0
+    STI ;M = 1
+    
+    MOV A, 0xA300
+    OUT 8 ; Background
+    MOV A, 123; Color
+    OUT 9
+
+
+;-------GREEN DRAWING START-----
+    MOV C, block_green
+    MOV D, 0x8920 ; ASCII ZA I
+    MOV B, 16
+    
+loop:
+	CMP B, 0
+    JE break_green
+    MOV A, D
+    OUT 8
+    MOV A, [C]
+    OUT 9
+  
+    DEC B
+    ADD C,2
+    ADD D,2
+    JMP loop
+    
+break_green:    
+    MOV C, 0x0E00 
+paint_green:
+	CMP C, 0x0FFF
+    JAE break_paint
+	MOV A, C
+    OUT 8
+    MOVB AH, 73
+    MOVB AL, 61
+    OUT 9
+    ADD C,2
+    CMP C, 64
+    JE newline
+	JMP paint_green
+newline: 
+	INCB CH
+    MOVB CL, 0    
+	JMP paint_green
+;----- GREEN DRAWING END-----------    
+    
+;-----CLOUD DRAWING START-------------    
+break_paint:
+	MOV C, clouds_white
+    MOV D, 0x8940 ; ASCII ZA I
+    MOV B, 16
+    
+loop_clouds:    
+    CMP B, 0
+    JE break_cloud
+    MOV A, D
+    OUT 8
+    MOV A, [C]
+    OUT 9
+  
+    DEC B
+    ADD C,2
+    ADD D,2
+    JMP loop_clouds
+    
+break_cloud:    
+    MOV C, 0x0000
+paint_cloud:
+	CMP C, 0x01D0
+    JAE break_mario
+	MOV A, C
+    OUT 8
+    MOVB AH, 73
+    MOVB AL, 255
+    OUT 9
+    ADD C,2
+    CMP C, 64
+    JE newline_cloud
+	JMP paint_cloud
+newline_cloud: 
+	INCB CH
+    MOVB CL, 0    
+	JMP paint_cloud
+
+;--------CLOUD DRAWING END------
+
+
+;----------MARIO RIGHT START----
+
+break_mario:
+	MOV D, 0x8820 ; ASCII ZA A
+    MOV C, mario_red_right ; String *char
+    MOV B, 16 ; Da skipam redica
+    
+loop_red:
+	CMP B,0
+    JE break_blue
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_red
+    
+break_blue:
+	MOV D, 0x8840 ; ASCII za B
+    MOV C, mario_blue_right ; String *char
+	MOV B, 16
+    
+loop_blue:
+	CMP B,0
+    JE break_orange
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_blue
+break_orange:
+	MOV D, 0x8860
+    MOV C, mario_orange_right
+    MOV B, 16
+    
+loop_orange:    
+    CMP B,0
+    JE left_sprite
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_orange
+;-----------MARIO RIGHT END------------    
+
+;-----------MARIO LEFT START-----------
+
+left_sprite:
+
+ 	MOV D, 0x8880 ; ASCII ZA D
+    MOV C, mario_red_left ; String *char
+    MOV B, 16 ; Da skipam redica
+    
+loop_red_left:
+	CMP B,0
+    JE break_blue_left
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_red_left
+    
+break_blue_left:
+	MOV D, 0x88A0 ; ASCII za E
+    MOV C, mario_blue_left ; String *char
+	MOV B, 16
+    
+loop_blue_left:
+	CMP B,0
+    JE break_orange_left
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_blue_left
+break_orange_left:
+	MOV D, 0x88C0
+    MOV C, mario_orange_left
+    MOV B, 16
+    
+loop_orange_left:    
+    CMP B,0
+    JE break_goomba_left
+    MOV A, D ; adresata D -> A
+ 	OUT 8
+    
+    MOV A, [C]
+    OUT 9
+    
+    DEC B
+    ADD C, 2 ; Skokam 2 za druga redica vo stringot
+    ADD D, 2 ; Next cell vo adresa za A
+    JMP loop_orange_left
+;-----------MARIO LEFT END--------------
+
+    
+;----------GOOMBA START--------------  
+
+break_goomba_left:
+    MOV D, 0x88E0 ; ASCII ZA G
+    MOV C, goomba_white
+    MOV B, 16 ; redica
+    	
+        
+loop_white:
+	CMP B, 0
+    JE break_white
+    MOV A, D ; ADRESA OD D VO A
+    OUT 8
+    MOV A, [C]
+    OUT 9 ; char
+    
+    
+    DEC B
+    ADD C, 2 ;Next pointer za dva
+    ADD D, 2 ;Next cell
+    JMP loop_white
+    
+break_white:    
+	MOV D, 0x8900 ; ASCII ZA H
+	MOV C, goomba_brown
+    MOV B, 16
+loop_brown:
+	CMP B, 0 
+    JE flag_start
+	MOV A, D
+    OUT 8
+    MOV A,[C]
+    OUT 9
+    
+    
+    DEC B
+	ADD C, 2 ; next char
+	ADD D, 2 ; next cell
+	JMP loop_brown
+    
+flag_start:  
+	MOV D, 0x0D0F
+    MOV C, flag
+draw_flag:
+	MOVB BL, [C]
+    CMPB BL, 0  
+    MOVB BH, 222
+    JE draw_pole
+    
+    MOV A, B
+    OUT 9
+    MOV A, D
+    OUT 8
+    INC C
+    ADD D,2
+    JMP draw_flag
+    
+draw_pole:
+	MOV D, 0x03A8 
+draw_pole_loop:
+
+	CMPB DL, 0xB0
+	JE draw_stick
+    
+    MOV A, D 
+    OUT 8
+    
+    MOVB AH ,73
+    MOVB AL, 236
+    OUT 9
+    
+	    
+    
+    INCB DH ; Next row
+   
+    
+    CMPB DH, 7
+    JNE draw_pole_loop
+    MOVB DH, 3 ; Return to top of next row
+    ADD D, 2 ; Next cell
+    JMP draw_pole_loop
+
+draw_stick:
+	MOV D, 0x07AE
+    
+draw_stick_loop:
+	CMPB DH, 0x0E
+    JE start
+    
+    MOV A,D
+    OUT 8
+    MOVB AH, 73
+    MOVB AL, 255
+    OUT 9
+    INCB DH
+    JMP draw_stick_loop
+;---------------GOOMBA END--------
+
+; MAIN GAME LOOP    
+start:
+    	CALL draw_mario_right
+        CALL draw_goomba
+        
+        
+        
+;-----------Animation loop----------
+		MOV C, 3 ; Counter for ending the game
+loop_animation:
+move_goomba: ; Infinite goomba's movement.
+	MOV A, 0xA320
+	OUT 8
+    
+    IN 9
+    SUBB AH, 2
+    OUT 9
+    
+    MOV A, 0xA324
+    OUT 8
+    
+    IN 9
+    SUBB AH, 2
+    OUT 9
+
+    MOV A, [move]
+    
+    CMP A, 1
+    JE move_right
+    
+    CMP A, 2
+    JE move_left
+  
+    CMP A, 3
+    JE move_up
+    
+    CMP A, 4
+    JE move_down
+ 	
+    
+    
+    
+    JMP loop_animation_continue
+    
+    
+; Making mario right move   
+
+move_right:
+    CALL draw_mario_right
+    CALL undraw_mario_left
+    CALL move_screen
+
+    MOV B, [right]
+    
+    MOV A, 0xA308
+    OUT 8
+    
+    MOV A, B
+    CMPB AH, 0xF0
+    JE loop_animation_continue
+    ADDB AH, 2
+    OUT 9
+    
+    MOV A, 0xA30C
+    OUT 8
+    
+    MOV A, B
+    CMPB AH, 0xF0
+    JE loop_animation_continue
+    ADDB AH, 2
+    OUT 9
+    
+    MOV A, 0xA310
+    OUT 8
+    
+    MOV A, B
+    CMPB AH, 0xF0
+    JE loop_animation_continue
+    ADDB AH, 2
+    OUT 9
+    
+    ADDB BH, 2
+    MOV [right], B
+    MOV [left], B
+    MOV [up], B
+    
+    JMP loop_animation_continue
+    
+;    Making mario left move    
+move_left:
+	CALL draw_mario_left
+	CALL undraw_mario_right
+    
+	MOV B, [left]
+
+    MOV A, 0xA314
+    OUT 8
+    
+    MOV A, B
+    
+    CMPB AH, 0;check for left
+    JE loop_animation_continue
+    
+    SUBB AH, 3
+    OUT 9
+    
+    MOV A, 0xA318
+    OUT 8
+    
+    MOV A, B
+    CMPB AH, 0
+    JE loop_animation_continue
+    
+    SUBB AH, 3
+    OUT 9
+    
+    MOV A, 0xA31C
+    OUT 8
+    
+    MOV A, B
+    CMPB AH, 0
+    JE loop_animation_continue
+    SUBB AH, 3
+    OUT 9
+    
+    SUBB BH, 3
+    MOV [left], B
+    MOV [right], B
+    MOV [up], B
+    
+    JMP loop_animation_continue
+; Making mario move up
+
+move_up:
+    MOV B, [up]
+
+    MOV A, 0xA308
+    OUT 8
+    
+    MOV A, B
+    
+    CMPB AL, 163 ; 163 = max jump value, when reached proceed to move_down.
+    JE move_up_done
+    
+    SUBB AL, 3
+    OUT 9
+    
+    MOV A, 0xA30C
+    OUT 8
+    
+    MOV A, B 
+    SUBB AL, 3
+    OUT 9
+    
+    MOV A, 0xA310
+    OUT 8
+    
+    MOV A, B
+    SUBB AL, 3
+    OUT 9
+    
+    ;;;;;;;;
+    
+    MOV A, 0xA314
+    OUT 8
+    
+    MOV A, B
+    
+    CMPB AL, 163 ; 163 = max jump value, when reached proceed to move_down.
+    JE move_up_done
+    
+    SUBB AL, 3
+    OUT 9
+    
+    MOV A, 0xA318
+    OUT 8
+    
+    MOV A, B
+    SUBB AL, 3
+    OUT 9
+    
+    MOV A, 0xA31C
+    OUT 8
+    
+    MOV A, B
+    SUBB AL, 3
+    OUT 9
+    
+    SUBB BL, 3
+    MOV [up], B
+    MOV [right], B
+    MOV [left], B
+    
+    JMP loop_animation_continue
+    
+move_up_done: ; Label is active when max jump value is reached.
+	MOV [move], 4 ; Redefine move to 4 (down).
+    JMP loop_animation_continue
+    
+move_down:
+	MOV B, [up]
+
+    MOV A, 0xA308
+    OUT 8
+    
+    MOV A, B
+    
+    CMPB AL, 208 ; 208 = ground position, when reached redefine move to 0.
+    JE move_down_done
+    
+    ADDB AL, 3
+    OUT 9
+    
+    MOV A, 0xA30C
+    OUT 8
+    
+    MOV A, B 
+    ADDB AL, 3
+    OUT 9
+    
+    MOV A, 0xA310
+    OUT 8
+    
+    MOV A, B
+    ADDB AL, 3
+    OUT 9
+    
+    ;;;;;;;;
+    
+    MOV A, 0xA314
+    OUT 8
+    
+    MOV A, B
+    
+    CMPB AL, 208 ; 208 = ground position, when reached redefine move to 0.
+    JE move_down_done
+    
+    ADDB AL, 3
+    OUT 9
+    
+    MOV A, 0xA318
+    OUT 8
+    
+    MOV A, B
+    ADDB AL, 3
+    OUT 9
+    
+    MOV A, 0xA31C
+    OUT 8
+    
+    MOV A, B
+    ADDB AL, 3
+    OUT 9
+    
+    ADDB BL, 3
+    MOV [up], B
+    MOV [right], B
+    MOV [left], B
+    
+    JMP loop_animation_continue
+    
+move_down_done:
+	MOV [move], 0
+
+
+
+loop_animation_continue:
+	 MOV A, 0xA320 ;Goomba
+     OUT 8
+     IN 9
+     MOV B, A
+     ADDB BH, 4
+    
+   	MOV A, [direction]
+    
+    CMP A, 0
+    JE animation_mario_right_x
+    
+    CMP A, 1
+    JE animation_mario_left_x
+    
+    JMP loop_animation_continue2
+    
+animation_mario_right_x:
+    MOV A, 0xA308 ;Mario
+    OUT 8
+    IN 9
+    MOV D, A
+    ADDB DH, 16
+    CMPB BH, DH
+    JBE first_condition ; Comparing x location
+	JMP loop_animation_continue2
+    
+animation_mario_left_x:
+	MOV A, 0xA314 ;Mario
+    OUT 8
+    IN 9
+    MOV D, A
+    ADDB DH, 16
+    CMPB BH, DH
+    JBE first_condition ; Comparing x location
+	JMP loop_animation_continue2
+    
+first_condition:
+	CMPB BH, AH
+    JAE second_condition
+    JMP loop_animation_continue2
+    
+second_condition:
+	MOV A, [direction]
+    
+    CMP A, 0
+    JE animation_mario_right_y
+    
+    CMP A, 1
+    JE animation_mario_left_y
+    
+    JMP loop_animation_continue2
+    
+animation_mario_right_y:
+	MOV A, 0xA308 ;Mario
+    OUT 8
+    IN 9
+    MOV D, A
+    ADDB DL, 8
+    CMPB BL, DL
+    JB third_condition ; Comparing y location
+	JMP loop_animation_continue2
+
+animation_mario_left_y:
+	MOV A, 0xA314 ;Mario
+    OUT 8
+    IN 9
+    MOV D, A
+    ADDB DL, 8
+    CMPB BL, DL
+    JB third_condition ; Comparing y location
+	JMP loop_animation_continue2
+    
+third_condition:
+	CMPB BL, AL
+    JE end_game
+    CMP C, 0
+    JE end_game
+    CALL draw_goomba
+    DEC C
+
+loop_animation_continue2:
+    CALL wait_frames
+    JMP loop_animation
+    
+end_game:
+	CLI
+    
+    CALL clear_screen
+    
+    MOV C, lose_string
+    MOV D, 0x0808
+    
+    MOV A, [win_status]
+    
+    CMP A, 1
+    JNE print_end_message
+    
+    MOV C, win_string
+    
+print_end_message:
+	MOVB BL, [C]
+    
+    CMPB BL, 0
+    JE print_end_message_break
+    
+    MOV A, D
+    OUT 8
+    
+    MOVB AH, BL
+    MOVB AL, 255
+    OUT 9
+    
+    INC C
+    ADD D, 2
+    
+    JMP print_end_message
+    
+print_end_message_break:
+	HLT
